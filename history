@@ -1,0 +1,199 @@
+CHECK THE IOMMU GROUPS
+
+parking@pop-os:~/Documents/kvm-article$ cat check_iommu.sh 
+#!/bin/bash
+
+
+for d in /sys/kernel/iommu_groups/*/devices/*; do
+	n=${d#*/iommu_groups/*}; n=${n%%/*}
+	printf 'IOMMU Group %s ' "$n"
+	lspci -nns "${d##*/}"
+done
+
+parking@pop-os:~/Documents/kvm-article$ ./check_iommu.sh 
+IOMMU Group 0 00:02.0 VGA compatible controller [0300]: Intel Corporation AlderLake-S GT1 [8086:4680] (rev 0c)
+IOMMU Group 10 00:1c.2 PCI bridge [0604]: Intel Corporation Device [8086:7a3a] (rev 11)
+IOMMU Group 11 00:1c.4 PCI bridge [0604]: Intel Corporation Device [8086:7a3c] (rev 11)
+IOMMU Group 12 00:1f.0 ISA bridge [0601]: Intel Corporation Device [8086:7a06] (rev 11)
+IOMMU Group 12 00:1f.3 Audio device [0403]: Intel Corporation Device [8086:7a50] (rev 11)
+IOMMU Group 12 00:1f.4 SMBus [0c05]: Intel Corporation Device [8086:7a23] (rev 11)
+IOMMU Group 12 00:1f.5 Serial bus controller [0c80]: Intel Corporation Device [8086:7a24] (rev 11)
+IOMMU Group 13 01:00.0 VGA compatible controller [0300]: NVIDIA Corporation Device [10de:2786] (rev a1)
+IOMMU Group 13 01:00.1 Audio device [0403]: NVIDIA Corporation Device [10de:22bc] (rev a1)
+IOMMU Group 14 02:00.0 Non-Volatile memory controller [0108]: Micron/Crucial Technology Device [c0a9:5407]
+IOMMU Group 15 03:00.0 Network controller [0280]: Realtek Semiconductor Co., Ltd. Device [10ec:c852] (rev 01)
+IOMMU Group 16 04:00.0 Ethernet controller [0200]: Realtek Semiconductor Co., Ltd. RTL8125 2.5GbE Controller [10ec:8125] (rev 05)
+IOMMU Group 17 05:00.0 Non-Volatile memory controller [0108]: Micron Technology Inc Device [1344:5416] (rev 01)
+IOMMU Group 1 00:00.0 Host bridge [0600]: Intel Corporation Device [8086:4640] (rev 02)
+IOMMU Group 2 00:01.0 PCI bridge [0604]: Intel Corporation 12th Gen Core Processor PCI Express x16 Controller #1 [8086:460d] (rev 02)
+IOMMU Group 3 00:06.0 PCI bridge [0604]: Intel Corporation 12th Gen Core Processor PCI Express x4 Controller #0 [8086:464d] (rev 02)
+IOMMU Group 4 00:14.0 USB controller [0c03]: Intel Corporation Device [8086:7a60] (rev 11)
+IOMMU Group 4 00:14.2 RAM memory [0500]: Intel Corporation Device [8086:7a27] (rev 11)
+IOMMU Group 5 00:15.0 Serial bus controller [0c80]: Intel Corporation Device [8086:7a4c] (rev 11)
+IOMMU Group 5 00:15.1 Serial bus controller [0c80]: Intel Corporation Device [8086:7a4d] (rev 11)
+IOMMU Group 5 00:15.2 Serial bus controller [0c80]: Intel Corporation Device [8086:7a4e] (rev 11)
+IOMMU Group 5 00:15.3 Serial bus controller [0c80]: Intel Corporation Device [8086:7a4f] (rev 11)
+IOMMU Group 6 00:16.0 Communication controller [0780]: Intel Corporation Device [8086:7a68] (rev 11)
+IOMMU Group 7 00:17.0 SATA controller [0106]: Intel Corporation Device [8086:7a62] (rev 11)
+IOMMU Group 8 00:19.0 Serial bus controller [0c80]: Intel Corporation Device [8086:7a7c] (rev 11)
+IOMMU Group 8 00:19.1 Serial bus controller [0c80]: Intel Corporation Device [8086:7a7d] (rev 11)
+IOMMU Group 9 00:1c.0 PCI bridge [0604]: Intel Corporation Device [8086:7a38] (rev 11)
+
+
+CHECK SSD DEVICE IOMMU GROUP
+
+parking@pop-os:~/Documents/kvm-article$ lsblk
+NAME          MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+sda             8:0    0   2,7T  0 disk  
+└─sda1          8:1    0   2,7T  0 part  
+sdb             8:16   0 447,1G  0 disk  
+├─sdb1          8:17   0   100M  0 part  
+├─sdb2          8:18   0    16M  0 part  
+├─sdb3          8:19   0 446,5G  0 part  
+└─sdb4          8:20   0   544M  0 part  
+zram0         251:0    0    16G  0 disk  [SWAP]
+nvme1n1       259:0    0 465,8G  0 disk  
+├─nvme1n1p1   259:1    0  1022M  0 part  /boot/efi
+├─nvme1n1p2   259:2    0     4G  0 part  /recovery
+├─nvme1n1p3   259:3    0 456,8G  0 part  /
+└─nvme1n1p4   259:4    0     4G  0 part  
+  └─cryptswap 252:0    0     4G  0 crypt [SWAP]
+nvme0n1       259:5    0 931,5G  0 disk  
+├─nvme0n1p1   259:6    0   100M  0 part  
+├─nvme0n1p2   259:7    0    16M  0 part  
+├─nvme0n1p3   259:8    0 930,5G  0 part  
+└─nvme0n1p4   259:9    0   868M  0 part  
+parking@pop-os:~/Documents/kvm-article$ udevadm info --name=/dev/sdb | grep DEVPATH
+E: DEVPATH=/devices/pci0000:00/0000:00:17.0/ata8/host7/target7:0:0/7:0:0:0/block/sdb
+
+
+So group 7 for the sata ssd and groupe 13 for the gpu
+
+INSTALLING THE HOOK MANAGER
+
+sudo wget 'https://raw.githubusercontent.com/PassthroughPOST/VFIO-Tools/master/libvirt_hooks/qemu' -O /etc/libvirt/hooks/qemu
+sudo chmod +x /etc/libvirt/hooks/qemu
+sudo service libvirtd restart
+
+SETTING UP START AND END HOOKS
+
+parking@pop-os:/etc/libvirt/hooks$ tree
+.
+├── kvm.conf
+├── qemu
+└── qemu.d
+    └── win11
+        ├── prepare
+        │   └── begin
+        │       ├── alloc_hugepages.sh
+        │       ├── bind_vfio.sh
+        │       └── cpu_mode_performance.sh
+        └── release
+            └── end
+                ├── cpu_node_ondemand.sh
+                ├── dealloc_hugepages.sh
+                └── unbind_vfio.sh
+
+6 directories, 8 files
+
+parking@pop-os:/etc/libvirt/hooks$ cat kvm.conf 
+## Virsh devices
+VIRSH_GPU_VIDEO=pci_0000_01_00_0
+VIRSH_GPU_AUDIO=pci_0000_01_00_1
+VIRSH_SATA_CONTROLLER=pci_0000_00_17_0
+
+parking@pop-os:/etc/libvirt/hooks/qemu.d/win11/prepare/begin$ ls
+alloc_hugepages.sh  bind_vfio.sh  cpu_mode_performance.sh
+parking@pop-os:/etc/libvirt/hooks/qemu.d/win11/prepare/begin$ cat *
+#!/bin/bash
+
+## Load the config file
+source "/etc/libvirt/hooks/kvm.conf"
+
+## Calculate number of hugepages to allocate from memory (in MB)
+HUGEPAGES="$(($MEMORY/$(($(grep Hugepagesize /proc/meminfo | awk '{print $2}')/1024))))"
+
+echo "Allocating hugepages..."
+echo $HUGEPAGES > /proc/sys/vm/nr_hugepages
+ALLOC_PAGES=$(cat /proc/sys/vm/nr_hugepages)
+
+TRIES=0
+while (( $ALLOC_PAGES != $HUGEPAGES && $TRIES < 1000 ))
+do
+    echo 1 > /proc/sys/vm/compact_memory            ## defrag ram
+    echo $HUGEPAGES > /proc/sys/vm/nr_hugepages
+    ALLOC_PAGES=$(cat /proc/sys/vm/nr_hugepages)
+    echo "Succesfully allocated $ALLOC_PAGES / $HUGEPAGES"
+    let TRIES+=1
+done
+
+if [ "$ALLOC_PAGES" -ne "$HUGEPAGES" ]
+then
+    echo "Not able to allocate all hugepages. Reverting..."
+    echo 0 > /proc/sys/vm/nr_hugepages
+    exit 1
+fi
+#!/bin/bash
+
+## Load the config file
+source "/etc/libvirt/hooks/kvm.conf"
+
+## Load vfio
+modprobe vfio
+modprobe vfio_iommu_type1
+modprobe vfio_pci
+
+## GPU Nvidia
+virsh nodedev-detach $VIRSH_GPU_VIDEO
+virsh nodedev-detach $VIRSH_GPU_AUDIO
+## Sata ssd 480gb
+virsh nodedev-detach $VIRSH_SATA_CONTROLLER
+#!/bin/bash
+
+## Load the config file
+source "/etc/libvirt/hooks/kvm.conf"
+
+## Enable CPU governor performance mode
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+for file in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "performance" > $file; done
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+
+
+
+
+parking@pop-os:/etc/libvirt/hooks/qemu.d/win11/release/end$ ls
+cpu_node_ondemand.sh  dealloc_hugepages.sh  unbind_vfio.sh
+parking@pop-os:/etc/libvirt/hooks/qemu.d/win11/release/end$ cat *
+#!/bin/bash
+
+## Load the config file
+source "/etc/libvirt/hooks/kvm.conf"
+
+## Enable CPU governor on-demand mode
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+for file in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "ondemand" > $file; done
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+#!/bin/bash
+
+## Load the config file
+source "/etc/libvirt/hooks/kvm.conf"
+
+echo 0 > /proc/sys/vm/nr_hugepages
+#!/bin/bash
+
+## Load the config file
+source "/etc/libvirt/hooks/kvm.conf"
+
+## Unbind gpu
+virsh nodedev-reattach $VIRSH_GPU_VIDEO
+virsh nodedev-reattach $VIRSH_GPU_AUDIO
+## Unbind ssd
+virsh nodedev-reattach $VIRSH_SATA_CONTROLLER
+
+## Unload vfio
+modprobe -r vfio_pci
+modprobe -r vfio_iommu_type1
+modprobe -r vfio
+
+
+
